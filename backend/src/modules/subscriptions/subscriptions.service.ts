@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Subscription } from './entities/subscription.entity';
@@ -8,6 +8,8 @@ import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 
 @Injectable()
 export class SubscriptionsService {
+  private readonly logger = new Logger(SubscriptionsService.name);
+
   constructor(
     @InjectRepository(Subscription)
     private subscriptionRepository: Repository<Subscription>,
@@ -115,24 +117,32 @@ export class SubscriptionsService {
   }
 
   async getAllPlans() {
-    const prices = await this.stripeService.listPrices();
-    // Cutoff timestamp for "now onwards" (Jan 30, 2026)
-    const cutoffDate = 1769731200;
+    try {
+      const prices = await this.stripeService.listPrices();
+      // Cutoff timestamp for "now onwards" (Jan 30, 2026)
+      const cutoffDate = 1769731200;
 
-    return prices.data
-      .filter((price) => {
-        const amount = (price.unit_amount || 0) / 100;
-        // Keep initial plans (499 and 4999) OR any plans created from today onwards
-        return amount === 499 || amount === 4999 || price.created >= cutoffDate;
-      })
-      .map((price) => ({
-        id: price.id,
-        nickname: (price.product as any).name,
-        amount: (price.unit_amount || 0) / 100,
-        currency: price.currency,
-        interval: price.recurring?.interval || 'month',
-        productId: (price.product as any).id,
-      }));
+      return prices.data
+        .filter((price) => {
+          const amount = (price.unit_amount || 0) / 100;
+          // Keep initial plans (499 and 4999) OR any plans created from today onwards
+          return amount === 499 || amount === 4999 || price.created >= cutoffDate;
+        })
+        .map((price) => {
+          const product = price.product as any;
+          return {
+            id: price.id,
+            nickname: product?.name || 'Unknown Plan',
+            amount: (price.unit_amount || 0) / 100,
+            currency: price.currency,
+            interval: price.recurring?.interval || 'month',
+            productId: product?.id || (typeof product === 'string' ? product : ''),
+          };
+        });
+    } catch (error) {
+      this.logger.error(`Error in getAllPlans: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   async getAllSubscriptions() {
