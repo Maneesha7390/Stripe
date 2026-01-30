@@ -24,6 +24,12 @@ export class Payment {
   @Column()
   status: string;
 
+  @Column({ nullable: true })
+  order_id: string;
+
+  @Column({ nullable: true })
+  subscriptionPlanId: string;
+
   @ManyToOne(() => User)
   user: User;
 

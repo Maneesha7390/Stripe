@@ -18,7 +18,7 @@ export class PaymentsService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private stripeService: StripeService,
-  ) {}
+  ) { }
 
   async createPaymentIntent(dto: CreatePaymentIntentDto) {
     const user = await this.userRepository.findOne({
@@ -36,11 +36,18 @@ export class PaymentsService {
       await this.userRepository.save(user);
     }
 
+    // Merge metadata
+    const stripeMetadata = {
+      ...(dto.metadata || {}),
+      order_id: dto.order_id || 'NOT_PROVIDED',
+      subscriptionPlanId: dto.subscriptionPlanId || 'NONE',
+    };
+
     const intent = await this.stripeService.createPaymentIntent(
       dto.amount,
       dto.currency,
       user.stripeCustomerId,
-      dto.metadata,
+      stripeMetadata,
     );
 
     // Save initial payment record
@@ -50,7 +57,9 @@ export class PaymentsService {
       currency: dto.currency,
       status: intent.status,
       user: user,
-      metadata: JSON.stringify(dto.metadata),
+      order_id: dto.order_id, // Can be null in DB
+      subscriptionPlanId: dto.subscriptionPlanId,
+      metadata: JSON.stringify(stripeMetadata),
     });
     await this.paymentRepository.save(payment);
 

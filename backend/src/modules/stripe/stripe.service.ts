@@ -71,6 +71,10 @@ export class StripeService {
     });
   }
 
+  async deleteSubscription(subscriptionId: string) {
+    return this.stripe.subscriptions.cancel(subscriptionId);
+  }
+
   // --- Refunds ---
   async createRefund(paymentIntentId: string, amount?: number) {
     return this.stripe.refunds.create({
@@ -140,5 +144,38 @@ export class StripeService {
     const subscription =
       await this.stripe.subscriptions.retrieve(subscriptionId);
     return subscription.items.data[0].id;
+  }
+
+  // --- Products and Prices ---
+  async createProduct(name: string, description?: string) {
+    return this.stripe.products.create({
+      name,
+      description,
+    });
+  }
+
+  async createPrice(
+    productId: string,
+    amount: number,
+    interval: 'month' | 'year',
+    currency: string = 'inr',
+  ) {
+    return this.stripe.prices.create({
+      product: productId,
+      unit_amount: Math.round(amount * 100),
+      currency,
+      recurring: { interval },
+    });
+  }
+
+  async listProducts() {
+    return this.stripe.products.list({ active: true });
+  }
+
+  async listPrices() {
+    return this.stripe.prices.list({
+      active: true,
+      expand: ['data.product'],
+    });
   }
 }

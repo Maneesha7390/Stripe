@@ -14,7 +14,7 @@ export class SubscriptionsService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private stripeService: StripeService,
-  ) {}
+  ) { }
 
   async createSubscription(dto: CreateSubscriptionDto) {
     const user = await this.userRepository.findOne({
@@ -69,5 +69,75 @@ export class SubscriptionsService {
     }
 
     return sub;
+  }
+
+  async deleteSubscription(subscriptionId: string) {
+    const sub = await this.stripeService.deleteSubscription(subscriptionId);
+
+    // Update DB
+    const dbSub = await this.subscriptionRepository.findOne({
+      where: { stripeId: subscriptionId },
+    });
+    if (dbSub) {
+      dbSub.status = sub.status; // should be 'canceled'
+      await this.subscriptionRepository.save(dbSub);
+    }
+
+    return sub;
+  }
+
+  async seedPlans() {
+    // Create a generic "Subscription Plan" product
+    const product = await this.stripeService.createProduct(
+      'Premium Membership',
+      'Access to premium features',
+    );
+
+    // Create Monthly Price: 499
+    const monthlyPrice = await this.stripeService.createPrice(
+      product.id,
+      499,
+      'month',
+    );
+
+    // Create Yearly Price: 4999
+    const yearlyPrice = await this.stripeService.createPrice(
+      product.id,
+      4999,
+      'year',
+    );
+
+    return {
+      product,
+      monthlyPrice,
+      yearlyPrice,
+    };
+  }
+
+  async getAllPlans() {
+    const prices = await this.stripeService.listPrices();
+    // Cutoff timestamp for "now onwards" (Jan 30, 2026)
+    const cutoffDate = 1769731200;
+
+    return prices.data
+      .filter((price) => {
+        const amount = (price.unit_amount || 0) / 100;
+        // Keep initial plans (499 and 4999) OR any plans created from today onwards
+        return amount === 499 || amount === 4999 || price.created >= cutoffDate;
+      })
+      .map((price) => ({
+        id: price.id,
+        nickname: (price.product as any).name,
+        amount: (price.unit_amount || 0) / 100,
+        currency: price.currency,
+        interval: price.recurring?.interval || 'month',
+        productId: (price.product as any).id,
+      }));
+  }
+
+  async getAllSubscriptions() {
+    return this.subscriptionRepository.find({
+      relations: ['user'],
+    });
   }
 }

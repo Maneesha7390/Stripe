@@ -28,8 +28,26 @@ export class CreatePaymentIntentDto {
   userId: number;
 
   @ApiProperty({
+    description: 'ID of the subscription plan if this is for a subscription start',
+    example: 'price_123',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  subscriptionPlanId?: string;
+
+  @ApiProperty({
+    description: 'Internal Order ID',
+    example: 'ORD-12345',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  order_id?: string;
+
+  @ApiProperty({
     description: 'Metadata for the payment',
-    example: { orderId: '123' },
+    example: { note: 'Extra info' },
     required: false,
   })
   @IsOptional()
